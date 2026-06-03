@@ -1,0 +1,60 @@
+name: Build LWJGL Android ARM64
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Clone zomdroid-dependencies
+        run: git clone https://github.com/liamelui/zomdroid-dependencies.git
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK
+        run: |
+          sdkmanager "ndk;27.0.12077973"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.0.12077973" >> $GITHUB_ENV
+
+      - name: Setup build env
+        run: |
+          NDK=$ANDROID_SDK_ROOT/ndk/27.0.12077973
+          echo "TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64" >> $GITHUB_ENV
+          echo "TOOLCHAIN_FILE_CMAKE=$NDK/build/cmake/android.toolchain.cmake" >> $GITHUB_ENV
+          echo "ANDROID_ABI=arm64-v8a" >> $GITHUB_ENV
+          echo "ANDROID_API_LEVEL=26" >> $GITHUB_ENV
+          echo "BUILD_TYPE_CMAKE=Release" >> $GITHUB_ENV
+          echo "TARGET_TRIPLE=aarch64-linux-android" >> $GITHUB_ENV
+
+      - name: Build LWJGL
+        run: |
+          cd zomdroid-dependencies
+          bash build-lwjgl-3.3.6.sh
+
+      - name: Package
+        run: |
+          zip -j lwjgl-android-arm64.zip \
+            zomdroid-dependencies/targets/libs/android-arm64-v8a/lwjgl-3.3.6/*.so
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lwjgl-android-arm64
+          path: lwjgl-android-arm64.zip
+
+      - name: Upload Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: lwjgl-android-arm64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
